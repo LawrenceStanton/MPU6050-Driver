@@ -1,19 +1,34 @@
 /**
-  * @file           : MPU6050.h
-  * @brief          : Body of methods to use the MPU6050.
+  * @file           : MOU6050.c
+  * @brief          : Source Code for MPU6050 API.
   * @author			: Lawrence Stanton
-  * @revised		: May 2020
-  ******************************************************************************
-  ******************************************************************************
-  * @attention		© University of Cape Town 2019
+  * @revised		: December 2020
+  ************************************************************************************
+  ************************************************************************************
+  * @attention		© LD Stanton 2019-2020
   *
-  * This file and its associates are under license. Please refer to the accompanying
-  * LICENCE file for details. Use outside of the license is prohibited except for
-  * exclusive use by the University of Cape Town or the SHARC Buoy Research Project.
+  * This document is the copyright property of the author and may only be reproduced,
+  * duplicated or published at the expressed written permission of the author.
+  * Reproduction, redaction or publication for any other purpose is only permitted
+  * upon expressed prior agreement or licence granted by the author. Requests for
+  * any such activity should be directed in writing to the author. Please refer to
+  * the associated LICENCE file for any blanket licence covering this document. In
+  * the absence of the LICENCE file, no licence is granted.
+  *
+  * This code is provided "as is" without any warranty whatsoever.
+  * The author reserves the right to make changes, corrections, improvements
+  * or modifications at any time, without notice. The author assumes no liability
+  * whatsoever relating to the use of this document or its associates.
+  * No licence to intellectual property rights is granted under this document.
+  * Any reference to third-party products or services shall not be deemed a licence
+  * grant for such products or services nor shall be considered a warranty covering
+  * the use of those products or services.
+  *
+  * All rights reserved.
   *
   * @instructions
   *
-  ******************************************************************************
+  ************************************************************************************
   */
 /* Main includes */
 
@@ -21,7 +36,10 @@
 /* math.h is necessary for a floating point exponent function and cannot be avoided without discarding the self test.
  * Consequently, the program immediately occupies >32KB, hence the need for a STM32F051C8T6 or some other chip with large flash capacity. */
 #include <math.h>
+#include <stdio.h>
 #include "MPU6050.h"
+
+#define I2C_TIMEOUT	1000
 
 /* Where a definition is referred to a header defined value it is because that value is intended to be passed into some method. */
 
@@ -231,6 +249,8 @@ MPU6050_ReturnTypedef selfTestMPU6050(I2C_HandleTypeDef *hi2c, uint8_t MPU6050_A
 	setSelfTest(hi2c, MPU6050_Addr, GYRO_CONFIG_ADDR,  GYRO_CONFIG_XG_ST  | GYRO_CONFIG_YG_ST  | GYRO_CONFIG_ZG_ST,  MPU6050_DISABLE);
 	setSelfTest(hi2c, MPU6050_Addr, ACCEL_CONFIG_ADDR, ACCEL_CONFIG_XA_ST | ACCEL_CONFIG_YA_ST | ACCEL_CONFIG_ZA_ST, MPU6050_DISABLE);
 
+	HAL_Delay(1000);
+
 	/* Get the test parameters */
 	getAG_Test(hi2c, MPU6050_Addr, A_Test, G_Test);
 
@@ -385,7 +405,7 @@ MPU6050_ReturnTypedef setMPU6050(I2C_HandleTypeDef *hi2c, uint8_t MPU6050_Addr, 
   * @note	The sample rate depends on the DLPF state. If this changes the resulting sample rate will change. See Register Map Sec. 4.2.
   * @param *hi2c:			The HAL I2C handle for the I2C line that the MPU6050 is on.
   * @param  MPU6050_Addr:	The I2C address of the MPU6050
-  * @param	sampleRate:		The register sample rate in kHz.
+  * @param	sampleRate:		The register sample rate in Hz.
   * @retval MPU6050_OK if success, MPU_FAIL_ otherwise.
   */
 MPU6050_ReturnTypedef setMPU6050SampleRate(I2C_HandleTypeDef *hi2c, uint8_t MPU6050_Addr, uint8_t sampleRate){
@@ -396,7 +416,7 @@ MPU6050_ReturnTypedef setMPU6050SampleRate(I2C_HandleTypeDef *hi2c, uint8_t MPU6
 
 	DLPF[0] &= CONFIG_DLPF_CFG;													// Filter to just have the DLPF information
 
-	uint8_t gyroRate = ((DLPF[0] == 0x00) || (DLPF[0] == 0x07)) ? 8 : 1;		// If DLPF = 0 or 7, 8kHz, else 1kHz
+	uint16_t gyroRate = ((DLPF[0] == 0x00) || (DLPF[0] == 0x07)) ? 8000 : 1000;		// If DLPF = 0 or 7, 8kHz, else 1kHz
 
 	/* If the sample rate requested was greater than the gyroscope rate, set to maximum rate. */
 	uint8_t divider = (gyroRate < sampleRate) ? 0 : ( (gyroRate - sampleRate ) / sampleRate );	// Set the divider value
@@ -425,7 +445,7 @@ static MPU6050_ReturnTypedef setMPU6050SampleRateDivider(I2C_HandleTypeDef *hi2c
   * @note 	Automatically run when setting the power cycle rate (setMPU6050PowerCycleRate)
   * @param *hi2c:		The HAL I2C handle for the I2C line that the MPU6050 is on.
   * @param  MPU6050_Addr	The I2C address of the MPU6050
-  * @PARAM	state		MPU6050_ENABLE or MPU6050_DISABLE
+  * @param	state		MPU6050_ENABLE or MPU6050_DISABLE
   * @retval MPU6050_OK if success, MPU_FAIL_ otherwise.
   */
 MPU6050_ReturnTypedef setMPU6050PowerCycle(I2C_HandleTypeDef *hi2c, uint8_t MPU6050_Addr, uint8_t state){
@@ -434,7 +454,7 @@ MPU6050_ReturnTypedef setMPU6050PowerCycle(I2C_HandleTypeDef *hi2c, uint8_t MPU6
 		setMPU6050TemperatureSensor(hi2c, MPU6050_Addr, MPU6050_DISABLE);
 		setMPU6050Gyroscopes(hi2c, MPU6050_Addr, MPU6050_GYROSCOPE_ALL_SET, MPU6050_DISABLE);
 
-		/* Enable the MPU6050 and set the cycling but to begin cycling. */
+		/* Enable the MPU6050 and set the cycling bit to begin cycling. */
 		int status = setMPU6050(hi2c, MPU6050_Addr, MPU6050_ENABLE);		// Save the exit status disable sleep method.
 		/* If the state was an error return the error. Otherwise return the outcome of the enabling of the cycle bit. */
 		return status != MPU6050_OK ? status : setBits(hi2c, MPU6050_Addr, PWR_MGMT_1_ADDR, PWR_MGMT_1_CYCLE);
@@ -469,7 +489,7 @@ MPU6050_ReturnTypedef setMPU6050PowerCycleRate(I2C_HandleTypeDef *hi2c, uint8_t 
 }
 
 /**
-  * @brief	Sets the Digital Low Pass Filter setting of the NPU6050.
+  * @brief	Sets the Digital Low Pass Filter setting of the MPU6050.
   * @param *hi2c:			The HAL I2C handle for the I2C line that the MPU6050 is on.
   * @param  MPU6050_Addr:	The I2C address of the MPU6050
   * @param	filterSetting:	The set setting of the filter. Please use MPU6050_DLPF_.
@@ -538,8 +558,8 @@ MPU6050_ReturnTypedef setMPU6050INTEnable(I2C_HandleTypeDef * hi2c, MPU6050_Addr
   * @note	The gyroscopes are enabled by default.
   * @note	Multiple gyroscopes can be set at once by bitwise ORing several gyroscope definitions in param gyros.
   * @param *hi2c:			The HAL I2C handle for the I2C line that the MPU6050 is on.
-  * @param  MPU6050_Addr:	The I2C address of the MPU6050
-  * @paramm	gyros:			Which gyroscopes to enable / disable. Use GYROSCOPE_N_SET. See note.
+  * @param  MPU6050_Addr:	The I2C address of the MPU6050.
+  * @param	gyros:			Which gyroscopes to enable / disable. Use GYROSCOPE_N_SET. See note.
   * @param  state:			MPU6050_ENABLE or MPU6050_DISABLE
   * @retval MPU6050_OK if success, MPU_FAIL_ otherwise.
   */
@@ -552,6 +572,13 @@ MPU6050_ReturnTypedef setMPU6050Gyroscopes(I2C_HandleTypeDef *hi2c, uint8_t MPU6
 	else return MPU6050_FAIL_INVALID_PARAMETER;														// Invalid parameter state.
 }
 
+/**
+ * @brief	Sets the measurement scale of the gyroscopes.
+ * @param 	hi2c			The HAL I2C handle for the I2C line that the MPU6050 is on.
+ * @param 	MPU6050_Addr	The I2C address of the MPU6050.
+ * @param 	scale			The desired gyroscope scale. Use MPU6050_GYROSCOPE_SCALE_N.
+ * @return	MPU6050_OK if success, MPU_FAIL_ otherwise.
+ */
 MPU6050_ReturnTypedef setMPU6050GyroscopeScale(I2C_HandleTypeDef *hi2c, uint8_t MPU6050_Addr, uint8_t scale){
 	return setScaleSel(hi2c, MPU6050_Addr, GYRO_CONFIG_ADDR, scale);
 }
@@ -728,7 +755,7 @@ static MPU6050_ReturnTypedef getGyroscopeScale(I2C_HandleTypeDef *hi2c, uint8_t 
 	if(status != MPU6050_OK) return status;									// If an error occurred return the error.
 
 	reg[0] = (reg[0] & GYRO_CONFIG_FS_SEL) >> 3;	// Filter the AFFS-SEL bits and divide the value to the actual selection.
-	*scale = 250 << reg[0];							// Formula for determining the LSB per deg/s. Ref. Register Map Sec. 4.19.
+	*scale = 0x83 >> reg[0];							// Formula for determining the LSB per deg/s. Ref. Register Map Sec. 4.19.
 
 	return MPU6050_OK;								// Return OK if method completes.
 }
@@ -749,10 +776,14 @@ MPU6050_ReturnTypedef getMPU6050Temperature(I2C_HandleTypeDef *hi2c, uint8_t MPU
 	uint8_t rawData[2];															// Copy of MPU6050 registers
 
 	int status = getRegisters(hi2c, MPU6050_Addr, TEMP_OUT_ADDR1, rawData, 2);	// Get the registers and save the outcome status.
-	int16_t T = (rawData[0] << 8) | rawData[1];									// Concatenate the registers
-	*temp = ((float)T / 340) + 36.53;											// Adjust as per the formula. Reg. Register Map Sec.4.18.
 
-	return status;															// Return OK if method completes.
+	if(status != MPU6050_OK) *temp = 0.0;										// Set *temp to 0 if error.
+	else{
+		int16_t T = (rawData[0] << 8) | rawData[1];								// Concatenate the registers.
+		*temp = ((float)T / 340) + 36.53;										// Adjust as per the formula. Reg. Register Map Sec.4.18.
+	}
+
+	return status;																// Return result from getRegisters.
 }
 
 /*
@@ -858,7 +889,7 @@ static MPU6050_ReturnTypedef setRegister(I2C_HandleTypeDef *hi2c, uint8_t MPU605
   */
 static MPU6050_ReturnTypedef getRegisters(I2C_HandleTypeDef *hi2c, uint8_t MPU6050_Addr, uint8_t MPU6050_Register_Addr, uint8_t* data, uint8_t size){
 	if( (validAddress(MPU6050_Addr) == MPU6050_OK) && (readableRegister(MPU6050_Register_Addr) == MPU6050_OK) ){				// Check for valid parameters
-		if(HAL_I2C_Mem_Read(hi2c, MPU6050_Addr << 1, MPU6050_Register_Addr, 1, data, size, HAL_MAX_DELAY) == HAL_OK) return MPU6050_OK;		// If read success
+		if(HAL_I2C_Mem_Read(hi2c, MPU6050_Addr << 1, MPU6050_Register_Addr, 1, data, size, I2C_TIMEOUT) == HAL_OK) return MPU6050_OK;		// If read success
 		else return MPU6050_FAIL_HAL;			// HAL Method I2C transfer unsuccessful.
 	}
 	else return MPU6050_FAIL_INVALID_PARAMETER;
@@ -879,7 +910,7 @@ static MPU6050_ReturnTypedef setRegisters(I2C_HandleTypeDef *hi2c, uint8_t MPU60
 	if( (validAddress(MPU6050_Addr) == MPU6050_OK)){
 		for(int i = 0; i < size; i++) if(writableRegister(MPU6050_Register_Addr) != MPU6050_OK) return MPU6050_FAIL_INVALID_PARAMETER;
 
-		if(HAL_I2C_Mem_Write(hi2c, MPU6050_Addr << 1, MPU6050_Register_Addr, 1, data, size, HAL_MAX_DELAY) == HAL_OK) return MPU6050_OK;	// If read success
+		if(HAL_I2C_Mem_Write(hi2c, MPU6050_Addr << 1, MPU6050_Register_Addr, 1, data, size, I2C_TIMEOUT) == HAL_OK) return MPU6050_OK;	// If read success
 		else return MPU6050_FAIL_HAL;			// HAL Method I2C transfer unsuccessful.
 	}
 	else return MPU6050_FAIL_INVALID_PARAMETER;
@@ -928,3 +959,42 @@ static MPU6050_ReturnTypedef writableRegister(uint8_t Reg_Address){
 		( (0x72 <= Reg_Address) && (Reg_Address <= 0x74) )  ) return MPU6050_OK;
 	else return MPU6050_FAIL_INVALID_PARAMETER;
 }
+
+/**
+ * @brief Deciphers a MPU6050_ReturnTypedef into a printed string.
+ * @param print User-defined method to print the resulting string.
+ * @param error Error code to be deciphered.
+ */
+void printMPU6050ErrorMessage(void (*print)(char * msg), MPU6050_ReturnTypedef error){
+	char c[100];
+
+	switch(error){
+	case MPU6050_OK:
+		sprintf(c, "MPU6050 Result Code %i: OK Result.\n", error);
+		break;
+	case MPU6050_FAIL:
+		sprintf(c, "MPU6050 Result Code %i: Unspecified Failure.\n", error);
+		break;
+	case MPU6050_FAIL_INVALID_PARAMETER:
+		sprintf(c, "MPU6050 Result Code %i: Invalid Parameter.\n", error);
+		break;
+	case MPU6050_FAIL_HAL:
+		sprintf(c, "MPU6050 Result Code %i: STM HAL Method Error.\n", error);
+		break;
+	case MPU6050_FAIL_DEVICE_NOT_FOUND:
+		sprintf(c, "MPU6050 Result Code %i: Device Not Found.\n", error);
+		break;
+	case MPU6050_FAIL_SELF_TEST:
+		sprintf(c, "MPU6050 Result Code %i: Self Test Fail.\n", error);
+		break;
+	case MPU6050_WARNING:
+		sprintf(c, "MPU6050 Result Code %i: Unspecified Warning.\n", error);
+		break;
+	default:
+		break;
+	}
+
+	print(c);
+}
+
+/******************** (C) LD STANTON 2019-2020 ********************/

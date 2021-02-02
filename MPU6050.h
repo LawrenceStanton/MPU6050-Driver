@@ -1,19 +1,36 @@
 /**
-  ******************************************************************************
-  * @file           : MPU6050.h
-  * @brief          : Header for MPU6050.c file.
-  *                   This file contains the common defines to use the MPU6050.
+  * @file           : MOU6050.h
+  * @brief          : Header file for MPU6050 API.
   * @author			: Lawrence Stanton
-  * @revised		: May 2020
-  ******************************************************************************
-  * @attention		© University of Cape Town 2019
+  * @revised		: December 2020
+  ************************************************************************************
+  ************************************************************************************
+  * @attention		© LD Stanton 2019-2020
   *
-  * This file and its associates are under license. Please refer to the accompanying
-  * LICENCE file for details. Use outside of the license is prohibited except for
-  * exclusive use by the University of Cape Town or the SHARC Buoy Research Project.
+  * This document is the copyright property of the author and may only be reproduced,
+  * duplicated or published at the expressed written permission of the author.
+  * Reproduction, redaction or publication for any other purpose is only permitted
+  * upon expressed prior agreement or licence granted by the author. Requests for
+  * any such activity should be directed in writing to the author. Please refer to
+  * the associated LICENCE file for any blanket licence covering this document. In
+  * the absence of the LICENCE file, no licence is granted.
   *
-  ******************************************************************************
+  * This code is provided "as is" without any warranty whatsoever.
+  * The author reserves the right to make changes, corrections, improvements
+  * or modifications at any time, without notice. The author assumes no liability
+  * whatsoever relating to the use of this document or its associates.
+  * No licence to intellectual property rights is granted under this document.
+  * Any reference to third-party products or services shall not be deemed a licence
+  * grant for such products or services nor shall be considered a warranty covering
+  * the use of those products or services.
+  *
+  * All rights reserved.
+  *
+  * @instructions
+  *
+  ************************************************************************************
   */
+
 #ifndef INC_MPU6050_H_
 #define INC_MPU6050_H_
 
@@ -272,6 +289,10 @@ MPU6050_ReturnTypedef getMPU6050Temperature(I2C_HandleTypeDef *, uint8_t, float 
 MPU6050_ReturnTypedef getMPU6050FIFOCount(I2C_HandleTypeDef *, uint8_t, uint16_t *);
 MPU6050_ReturnTypedef getMPU6050FIFO(I2C_HandleTypeDef *, uint8_t, uint16_t, uint8_t *);
 
+/* Miscellaneous */
+void printMPU6050ErrorMessage(void (*)(char *), MPU6050_ReturnTypedef);
 /* End public function prototypes */
 
 #endif /* INC_MPU6050_H_ */
+
+
